@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { seedState } from './seed';
-import { addPettyCash, closeShift, completeSale, currentShift, openShift, pettyBalance, refundSale, summariseShift } from './actions';
+import { addPettyCash, cancelLayby, createLayby, findByCode, issueVoucher, laybyBalance, linkBarcode, payLayby, postDelivery, closeShift, completeSale, currentShift, openShift, pettyBalance, refundSale, summariseShift } from './actions';
 import type { AppState, CartLine } from '../types';
 
 function setup(): AppState {
@@ -108,5 +108,71 @@ describe('sales workflow', () => {
     addPettyCash(s, { ...base, type: 'expense', amount: 1250, description: 'soap' });
     expect(pettyBalance(s)).toBe(48750);
     expect(() => addPettyCash(s, { ...base, type: 'expense', amount: 500, description: '  ' })).toThrow(/spent on/);
+  });
+
+  it('runs a lay-by from deposit to collection', () => {
+    const s = setup();
+    const c = s.customers[0];
+    const biltong = s.products.find((p) => p.name === 'Biltong 100g')!;
+    const before = biltong.stock;
+    const lines = [cartOf(s, 'Biltong 100g', 2)]; // R130
+    expect(() => createLayby(s, { staffId: 'staff-csh', customerId: c.id, lines, cartDiscountPct: 0, deposit: 500, method: 'cash' })).toThrow(/at least/);
+    const l = createLayby(s, { staffId: 'staff-csh', customerId: c.id, lines, cartDiscountPct: 0, deposit: 3000, method: 'cash' });
+    expect(biltong.stock).toBe(before - 2); // reserved
+    expect(laybyBalance(l)).toBe(10000);
+    expect(() => payLayby(s, 'staff-csh', l.id, 20000, 'card')).toThrow(/more than/);
+    payLayby(s, 'staff-csh', l.id, 4000, 'card');
+    payLayby(s, 'staff-csh', l.id, 6000, 'cash');
+    const done = s.laybys.find((x) => x.id === l.id)!;
+    expect(done.status).toBe('completed');
+    const sale = s.sales.find((x) => x.id === done.saleId)!;
+    expect(sale.totals.total).toBe(13000);
+    expect(biltong.stock).toBe(before - 2); // not deducted twice
+    const sum = summariseShift(s, currentShift(s)!);
+    expect(sum.byMethod.cash).toBe(9000);
+    expect(sum.byMethod.card).toBe(4000);
+    expect(sum.laybyAndVouchers).toBe(13000);
+  });
+
+  it('cancels a lay-by with a fee and returns the stock', () => {
+    const s = setup();
+    const biltong = s.products.find((p) => p.name === 'Biltong 100g')!;
+    const before = biltong.stock;
+    const l = createLayby(s, { staffId: 'a', customerId: s.customers[0].id, lines: [cartOf(s, 'Biltong 100g', 2)], cartDiscountPct: 0, deposit: 5000, method: 'cash' });
+    const r = cancelLayby(s, 'staff-mgr', l.id, 'cash');
+    expect(r).toEqual({ fee: 1300, refund: 3700 });
+    expect(biltong.stock).toBe(before);
+    expect(summariseShift(s, currentShift(s)!).byMethod.cash).toBe(1300);
+  });
+
+  it('sells and redeems gift vouchers', () => {
+    const s = setup();
+    const v = issueVoucher(s, { staffId: 'a', value: 5000, holderName: 'Sipho', holderPhone: '', method: 'card' });
+    expect(v.code).toMatch(/^NX-[A-Z0-9]{4}-[A-Z0-9]{4}$/);
+    const sale = completeSale(s, {
+      staffId: 'a',
+      customerId: null,
+      lines: [cartOf(s, 'Cappuccino', 1)],
+      payments: [{ method: 'voucher', amount: 3200, reference: v.code.toLowerCase() }],
+      cartDiscountPct: 0,
+    });
+    expect(s.vouchers[0].balance).toBe(1800);
+    expect(s.vouchers[0].redemptions[0].saleId).toBe(sale.id);
+    expect(() =>
+      completeSale(s, { staffId: 'a', customerId: null, lines: [cartOf(s, 'Biltong 100g', 1)], payments: [{ method: 'voucher', amount: 6500, reference: v.code }], cartDiscountPct: 0 }),
+    ).toThrow(/only has/);
+    expect(summariseShift(s, currentShift(s)!).byMethod.card).toBe(5000);
+  });
+
+  it('receives a whole box from one scan of its barcode', () => {
+    const s = setup();
+    const water = s.products.find((p) => p.name === 'Still Water 500ml')!;
+    expect(findByCode(s.products, '16001000000070')).toMatchObject({ qty: 24, isPack: true });
+    linkBarcode(s, 'staff-mgr', water.id, '26001000000077', 12);
+    expect(() => linkBarcode(s, 'staff-mgr', water.id, '26001000000077', 6)).toThrow(/already belongs/);
+    const before = water.stock;
+    postDelivery(s, 'staff-mgr', [{ productId: water.id, qty: 24 + 12, cost: 480 }], 'Acme', 'INV9');
+    expect(water.stock).toBe(before + 36);
+    expect(water.cost).toBe(480);
   });
 });

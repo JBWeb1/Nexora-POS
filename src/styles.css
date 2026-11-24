@@ -469,3 +469,29 @@ td.actions .btn { margin-left: 6px; }
 .search.removing { box-shadow: 0 0 0 2px var(--danger); background: var(--danger-soft); }
 .grid.removing .tile { box-shadow: inset 0 0 0 2px var(--danger), var(--shadow-md); }
 .btn.remove-on { background: var(--danger); color: #fff; }
+
+.method-tabs.three { grid-template-columns: repeat(3, 1fr); }
+.layby-link { margin-top: 10px; width: 100%; background: transparent; }
+.method-tabs { grid-template-columns: repeat(5, 1fr); }
+
+/* Lay-bys, vouchers, receiving */
+.click-row { cursor: pointer; }
+.progress { height: 4px; background: var(--fill); border-radius: 99px; margin-top: 4px; overflow: hidden; }
+.progress span { display: block; height: 100%; background: var(--ok); border-radius: 99px; }
+.layby-actions { display: flex; flex-direction: column; gap: 10px; }
+.voucher-code { font-family: 'SF Mono', ui-monospace, Menlo, Consolas, monospace; font-weight: 600; letter-spacing: 0.04em; }
+.voucher-value { font-size: 1.8rem; font-weight: 700; margin: 6px 0; }
+.voucher-big-code { font-size: 1.15rem; font-weight: 700; letter-spacing: 0.12em; border: 1.5px dashed #000; padding: 8px; margin: 8px 0; }
+.scan-zone {
+  margin-top: 14px; background: var(--panel); border-radius: var(--radius-l); padding: 28px; text-align: center; box-shadow: var(--shadow-md);
+  display: flex; flex-direction: column; align-items: center; gap: 4px; color: var(--text-2);
+}
+.scan-zone .checker-name { color: var(--text); }
+.scan-zone.hit { animation: pop 0.35s var(--ease); box-shadow: inset 0 0 0 2px var(--ok), var(--shadow-md); }
+.scan-plus { font-size: 2.6rem; font-weight: 800; color: var(--ok); letter-spacing: -0.03em; line-height: 1; }
+@keyframes pop { from { transform: scale(0.97); } }
+.segmented.full { display: grid; grid-template-columns: 1fr 1fr; }
+.list-item.picked { background: var(--primary-soft) !important; }
+.packs { margin-top: 12px; background: var(--fill); border-radius: var(--radius); padding: 10px 14px; display: flex; flex-direction: column; gap: 8px; }
+.pack-row { display: flex; align-items: center; gap: 8px; }
+.pack-row input:first-child { flex: 1; }

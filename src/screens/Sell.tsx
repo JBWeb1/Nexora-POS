@@ -2,7 +2,9 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from '../store';
 import type { CartLine, Customer, Payment, PaymentMethod, Product, Sale } from '../types';
 import { calcTotals, formatMoney, lineTotal, paidAmount, parseMoney, quickTenders } from '../lib/money';
-import { audit, completeSale, currentShift, openShift } from '../lib/actions';
+import { audit, checkVoucher, completeSale, createLayby, currentShift, findByCode, findVoucher, openShift } from '../lib/actions';
+import { LaybySlip } from './Laybys';
+import type { Layby } from '../types';
 import { uid } from '../lib/id';
 import { Field, Modal, useApproval, useToast } from '../components/ui';
 import { Receipt } from '../components/Receipt';
@@ -23,7 +25,8 @@ export function Sell() {
   const [selected, setSelected] = useState<number>(-1);
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState(FAV);
-  const [modal, setModal] = useState<null | 'pay' | 'customer' | 'recall' | 'discount' | 'lineedit'>(null);
+  const [modal, setModal] = useState<null | 'pay' | 'customer' | 'recall' | 'discount' | 'lineedit' | 'layby'>(null);
+  const [newLayby, setNewLayby] = useState<Layby | null>(null);
   const [lastSale, setLastSale] = useState<Sale | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
@@ -45,11 +48,13 @@ export function Sell() {
   // Hardware scanner (Mindeo etc.): works even when the search box isn't focused. "3*" typed first still multiplies.
   useBarcodeScanner(
     (code) => {
-      const hit = products.find((p) => p.barcode === code || p.sku.toLowerCase() === code.toLowerCase());
-      if (!hit) return toast(`No product with barcode ${code}`, 'error');
-      if (removeMode) return removeProduct(hit);
+      const found = findByCode(products, code);
+      if (!found) return toast(`No product with barcode ${code}`, 'error');
+      if (removeMode) return removeProduct(found.product);
       const mult = searchRef.current?.value.match(/^(\d+)\*$/);
-      addProduct(hit, mult ? Math.max(1, parseInt(mult[1], 10)) : 1);
+      // A box barcode sells the whole box (e.g. 24 waters).
+      addProduct(found.product, found.qty * (mult ? Math.max(1, parseInt(mult[1], 10)) : 1));
+      if (found.isPack) toast(`Box of ${found.qty} × ${found.product.name}`, 'info');
     },
     { enabled: !modal && !!shift, suffix: state.settings.scannerSuffix ?? 'Enter' },
   );
@@ -80,10 +85,10 @@ export function Sell() {
     const qty = mult ? Math.max(1, parseInt(mult[1], 10)) : 1;
     const term = query.replace(/^\d+\*/, '').trim();
     if (!term) return;
-    const exact = products.find((p) => p.barcode === term || p.sku.toLowerCase() === term.toLowerCase());
-    const hit = exact ?? (visible.length === 1 ? visible[0] : undefined);
+    const exact = findByCode(products, term);
+    const hit = exact?.product ?? (visible.length === 1 ? visible[0] : undefined);
     if (hit && removeMode) removeProduct(hit);
-    else if (hit) addProduct(hit, qty);
+    else if (hit) addProduct(hit, qty * (exact?.qty ?? 1));
     else if (visible.length > 1) toast(`${visible.length} matches — tap one`, 'info');
     else toast(`No product for "${term}"`, 'error');
   };
@@ -436,6 +441,7 @@ export function Sell() {
           total={totals.total}
           customer={customer}
           onClose={() => (setModal(null), focusSearch())}
+          onLayby={() => setModal('layby')}
           onComplete={(payments) => {
             try {
               const sale = update((s) =>
@@ -449,6 +455,37 @@ export function Sell() {
             }
           }}
         />
+      )}
+
+      {modal === 'layby' && (
+        <LaybyCreateModal
+          total={totals.total}
+          customer={customer}
+          onPickCustomer={(id) => setCustomerId(id)}
+          onClose={() => setModal('pay')}
+          onCreate={(deposit, method) => {
+            try {
+              const lb = update((s) =>
+                createLayby(s, { staffId: user!.id, customerId: customerId ?? '', lines: cart, cartDiscountPct: cartDiscount, deposit, method }),
+              );
+              setModal(null);
+              setNewLayby(lb);
+              resetSale();
+            } catch (e) {
+              toast((e as Error).message, 'error');
+            }
+          }}
+        />
+      )}
+
+      {newLayby && (
+        <Modal title="Lay-by created" onClose={() => (setNewLayby(null), focusSearch())}>
+          <LaybySlip layby={state.laybys.find((l) => l.id === newLayby.id) ?? newLayby} />
+          <div className="row-between">
+            <button className="btn" onClick={() => window.print()}>Print lay-by slip</button>
+            <button className="btn primary" onClick={() => (setNewLayby(null), focusSearch())}>Done</button>
+          </div>
+        </Modal>
       )}
 
       {lastSale && <ReceiptModal sale={lastSale} onClose={() => (setLastSale(null), focusSearch())} />}
@@ -486,7 +523,7 @@ function OpenShift() {
   );
 }
 
-function CustomerPicker({ onPick, onClose }: { onPick: (c: Customer) => void; onClose: () => void }) {
+export function CustomerPicker({ onPick, onClose }: { onPick: (c: Customer) => void; onClose: () => void }) {
   const { state, update } = useStore();
   const [q, setQ] = useState('');
   const [adding, setAdding] = useState(false);
@@ -675,6 +712,7 @@ const METHODS: { id: PaymentMethod; label: string }[] = [
   { id: 'card', label: 'Card' },
   { id: 'eft', label: 'EFT' },
   { id: 'account', label: 'Account' },
+  { id: 'voucher', label: 'Voucher' },
 ];
 
 function PaymentModal({
@@ -682,11 +720,13 @@ function PaymentModal({
   customer,
   onComplete,
   onClose,
+  onLayby,
 }: {
   total: number;
   customer: Customer | undefined;
   onComplete: (p: Payment[]) => void;
   onClose: () => void;
+  onLayby: () => void;
 }) {
   const { state } = useStore();
   const toast = useToast();
@@ -698,6 +738,7 @@ function PaymentModal({
   const [amount, setAmount] = useState((remaining / 100).toFixed(2));
   const [card, setCard] = useState<null | { cents: number; stage: 'waiting' | 'confirm' }>(null);
   const [authCode, setAuthCode] = useState('');
+  const [voucherCode, setVoucherCode] = useState('');
   const terminal = state.settings.terminal ?? DEFAULT_TERMINAL;
   const change = Math.max(0, paid - total);
   const done = paid >= total;
@@ -731,6 +772,24 @@ function PaymentModal({
     }
     if (method === 'card') return startCard(cents);
     record({ method, amount: cents });
+  };
+
+  /** Gift voucher: uses whatever is left on the voucher, up to the amount owed. */
+  const addVoucher = () => {
+    const v = findVoucher(state, voucherCode);
+    try {
+      if (!v) throw new Error('Voucher not found — check the code');
+      const used = payments.filter((p) => p.method === 'voucher' && p.reference === v.code).reduce((a, p) => a + p.amount, 0);
+      const available = v.balance - used;
+      if (available <= 0) throw new Error('This voucher has nothing left on it');
+      const amt = Math.min(available, remaining);
+      checkVoucher(v, amt + used);
+      setVoucherCode('');
+      toast(`Voucher ${v.code}: ${m(amt)} used, ${m(available - amt)} left`, 'info');
+      record({ method: 'voucher', amount: amt, reference: v.code });
+    } catch (e) {
+      toast((e as Error).message, 'error');
+    }
   };
 
   if (card) {
@@ -793,6 +852,19 @@ function PaymentModal({
               ))}
             </div>
           )}
+          {method === 'voucher' ? (
+            <div className="pay-input">
+              <input
+                autoFocus
+                value={voucherCode}
+                onChange={(e) => setVoucherCode(e.target.value.toUpperCase())}
+                onKeyDown={(e) => e.key === 'Enter' && addVoucher()}
+                placeholder="Scan or type voucher code"
+                aria-label="Voucher code"
+              />
+              <button className="btn primary" onClick={addVoucher}>Use voucher</button>
+            </div>
+          ) : (
           <div className="pay-input">
             <input
               autoFocus
@@ -806,6 +878,12 @@ function PaymentModal({
               {parseMoney(amount) < remaining ? 'Add part payment' : 'Complete sale'}
             </button>
           </div>
+          )}
+          {payments.length === 0 && (
+            <button className="btn layby-link" onClick={onLayby}>
+              Put on lay-by instead…
+            </button>
+          )}
           {method === 'account' && customer && (
             <p className="muted small">
               {customer.name}: balance {m(customer.accountBalance)} / limit {m(customer.accountLimit)}
@@ -906,5 +984,74 @@ function SwipeToDelete({ children, onDelete }: { children: React.ReactNode; onDe
         {children}
       </div>
     </div>
+  );
+}
+
+function LaybyCreateModal({
+  total,
+  customer,
+  onPickCustomer,
+  onCreate,
+  onClose,
+}: {
+  total: number;
+  customer: Customer | undefined;
+  onPickCustomer: (id: string) => void;
+  onCreate: (deposit: number, method: PaymentMethod) => void;
+  onClose: () => void;
+}) {
+  const { state } = useStore();
+  const toast = useToast();
+  const m = (c: number) => formatMoney(c, state.settings.currency);
+  const minPct = state.settings.laybyMinDepositPct ?? 10;
+  const minDeposit = Math.ceil((total * minPct) / 100);
+  const [deposit, setDeposit] = useState((minDeposit / 100).toFixed(2));
+  const [method, setMethod] = useState<PaymentMethod>('cash');
+  const [picking, setPicking] = useState(false);
+  const due = new Date();
+  due.setMonth(due.getMonth() + (state.settings.laybyMonths ?? 3));
+  const dep = parseMoney(deposit);
+
+  if (picking) {
+    return <CustomerPicker onPick={(c) => (onPickCustomer(c.id), setPicking(false))} onClose={() => setPicking(false)} />;
+  }
+
+  const create = () => {
+    if (!customer) return toast('Choose or add the customer first', 'error');
+    if (isNaN(dep)) return toast('Enter the deposit', 'error');
+    onCreate(dep, method);
+  };
+
+  return (
+    <Modal title="New lay-by" onClose={onClose}>
+      <div className="pay-due">
+        <div className="muted">Lay-by total</div>
+        <div className="pay-amount">{m(total)}</div>
+        <div className="muted small">Collect by {due.toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
+      </div>
+      <button className="btn customer-btn" onClick={() => setPicking(true)}>
+        <Icon name="person" size={20} />
+        {customer ? (
+          <>
+            {customer.name} <span className="muted small">· {customer.phone || 'no phone — add one'}</span>
+          </>
+        ) : (
+          <span>Choose or add customer</span>
+        )}
+      </button>
+      <Field label={`Deposit (minimum ${minPct}% = ${m(minDeposit)})`}>
+        <input inputMode="decimal" value={deposit} onChange={(e) => setDeposit(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && create()} />
+      </Field>
+      <div className="method-tabs three">
+        {(['cash', 'card', 'eft'] as PaymentMethod[]).map((x) => (
+          <button key={x} className={`btn ${method === x ? 'primary' : ''}`} onClick={() => setMethod(x)}>
+            {x === 'eft' ? 'EFT' : x[0].toUpperCase() + x.slice(1)}
+          </button>
+        ))}
+      </div>
+      {method === 'card' && <p className="muted small">Process the deposit on the card machine first.</p>}
+      {!isNaN(dep) && dep >= 0 && <p className="small">Balance after deposit: <b>{m(Math.max(0, total - dep))}</b></p>}
+      <button className="btn primary big" onClick={create}>Take deposit & reserve items</button>
+    </Modal>
   );
 }

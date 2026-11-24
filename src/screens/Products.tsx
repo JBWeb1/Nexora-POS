@@ -87,7 +87,7 @@ export function Products() {
                 <tr key={p.id}>
                   <td>{p.favourite && '★ '}{p.name}{p.vatExempt && <span className="tag">Zero-rated</span>}</td>
                   <td>{p.category}</td>
-                  <td className="muted small">{p.sku}<br />{p.barcode}</td>
+                  <td className="muted small">{p.sku}<br />{p.barcode}{p.packs?.map((k) => <div key={k.barcode}>Box {k.barcode} ×{k.qty}</div>)}</td>
                   <td className="num">{m(p.price)}</td>
                   <td className={`num ${margin < 20 ? 'warn-text' : ''}`}>{margin}%</td>
                   <td className={`num ${p.stock <= p.reorderLevel ? 'warn-text' : ''}`}>{p.stock}</td>
@@ -132,8 +132,14 @@ function ProductForm({ product, onClose }: { product: Product; onClose: () => vo
     if (isNaN(pr) || isNaN(co)) return toast('Enter valid prices', 'error');
     const dup = state.products.find((x) => x.id !== p.id && ((p.barcode && x.barcode === p.barcode) || (p.sku && x.sku === p.sku)));
     if (dup) return toast(`Barcode/SKU already used by ${dup.name}`, 'error');
+    const packs = (p.packs ?? []).filter((k) => k.barcode);
+    if (packs.some((k) => !(k.qty >= 2))) return toast('A box must contain at least 2 items', 'error');
+    for (const k of packs) {
+      const clash = state.products.find((x) => x.id !== p.id && (x.barcode === k.barcode || x.packs?.some((y) => y.barcode === k.barcode)));
+      if (clash || k.barcode === p.barcode) return toast(`Box barcode ${k.barcode} is already used${clash ? ` by ${clash.name}` : ''}`, 'error');
+    }
     update((s) => {
-      const next = { ...p, price: pr, cost: co, name: p.name.trim(), category: p.category.trim() };
+      const next = { ...p, price: pr, cost: co, name: p.name.trim(), category: p.category.trim(), packs: (p.packs ?? []).filter((k) => k.barcode) };
       if (!p.id) {
         next.id = uid();
         if (!next.sku) next.sku = `SKU-${s.products.length + 1}`;
@@ -161,6 +167,21 @@ function ProductForm({ product, onClose }: { product: Product; onClose: () => vo
         <Field label="Cost price excl. VAT (R)"><input inputMode="decimal" value={cost} onChange={(e) => setCost(e.target.value)} /></Field>
         {!p.id && <Field label="Opening stock"><input inputMode="numeric" value={p.stock} onChange={(e) => set('stock', parseInt(e.target.value || '0', 10))} /></Field>}
         <Field label="Reorder when stock ≤"><input inputMode="numeric" value={p.reorderLevel} onChange={(e) => set('reorderLevel', parseInt(e.target.value || '0', 10))} /></Field>
+      </div>
+      <div className="packs">
+        <div className="row-between" style={{ marginTop: 0 }}>
+          <span className="field" style={{ margin: 0 }}>Box / case barcodes — scanning one adds the whole box</span>
+          <button className="btn small-btn" onClick={() => set('packs', [...(p.packs ?? []), { barcode: '', qty: 12 }])}>+ Add box barcode</button>
+        </div>
+        {(p.packs ?? []).map((k, i) => (
+          <div key={i} className="pack-row">
+            <input placeholder="Scan the box barcode" value={k.barcode} onChange={(e) => set('packs', (p.packs ?? []).map((x, j) => (j === i ? { ...x, barcode: e.target.value.trim() } : x)))} />
+            <span className="muted small">contains</span>
+            <input className="qty-input" inputMode="numeric" value={k.qty} onChange={(e) => set('packs', (p.packs ?? []).map((x, j) => (j === i ? { ...x, qty: parseInt(e.target.value || '0', 10) || 0 } : x)))} />
+            <span className="muted small">items</span>
+            <button className="icon-btn trash" aria-label="Remove box barcode" onClick={() => set('packs', (p.packs ?? []).filter((_, j) => j !== i))}>✕</button>
+          </div>
+        ))}
       </div>
       <div className="checks">
         <label><input type="checkbox" checked={p.favourite} onChange={(e) => set('favourite', e.target.checked)} /> Show on Favourites quick-keys</label>

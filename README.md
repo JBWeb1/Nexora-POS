@@ -11,9 +11,12 @@ A fast, simple point of sale for South African retail: easier to learn than trad
 | Area | What it does |
 | --- | --- |
 | **Home** | Today's takings, till status, low stock and petty cash at a glance. **Arrange Icons** (drag, or sort A–Z), saved per staff member. |
-| **Sell** | One-screen checkout. Scan or tap, quick-cash buttons with the change worked out for you, split payments (cash / card / EFT / account), park & recall sales, **easy item removal** (press F3 / Remove then scan or tap the item, swipe a line left, or tap the bin; every removal is audit-logged), line and whole-sale discounts, customers and loyalty points, 80mm receipts. |
+| **Sell** | One-screen checkout. Scan or tap (box barcodes sell the whole box), quick-cash buttons with the change worked out for you, split payments (cash / card / EFT / account / gift voucher), park & recall sales, **easy item removal** (press F3 / Remove then scan or tap the item, swipe a line left, or tap the bin; every removal is audit-logged), line and whole-sale discounts, customers and loyalty points, 80mm receipts. |
 | **Sales** | Find any receipt, reprint, and do partial or full refunds that put the stock back. |
 | **Stock Checker** | Scan any item: price, stock on hand, sold in the last 30 days, how many days of stock are left. Supervisors can correct the count on the spot. |
+| **Lay-bys** | Start one from Sell (scan items → Pay → *Put on lay-by instead*), pick or add the customer, take a deposit (minimum 10%). Items are reserved straight away. Take instalments in cash/card/EFT. When it's fully paid it becomes a normal tax-invoice sale. Cancelling returns the stock and refunds the payments minus a 10% fee. Overdue tracking and printable slips. |
+| **Vouchers** | Sell gift vouchers to anyone (pick or add a person). Each gets a code like `NX-ABCD-EFGH` and is valid for 3 years (CPA). Customers pay with *Voucher* at the till and can spend it in parts; the balance is tracked. |
+| **Receive Stock** | Scan deliveries. **Scanning a box barcode adds the whole box** (e.g. 24) automatically. A barcode the system doesn't know is linked once ("box of 12 Coke"), then works by itself from then on. *Auto add* puts every scan straight into stock (with Undo), or use *Review first*. Also takes a supplier CSV upload (`barcode,qty,cost`), with box barcodes multiplied out. |
 | **Petty Cash** | A separate cash box for small expenses (cleaning, stationery, refreshments…) with top-ups, slip numbers, supervisor approval, spend by category and CSV export. Keeps till cash-ups clean. |
 | **Till** | Open with a float, record cash paid out or added, a guided count by note and coin (R200 … 10c), over/short calculated, and a Z-report. |
 | **Back Office** | Dashboard (takings, profit, top sellers, staff sales), Products & stock (receive deliveries, stock counts, reorder list), Customers (accounts, credit limits, payments), Devices, Settings (staff & PINs, VAT, receipts, backups, audit log). |
@@ -105,7 +108,6 @@ Stack: React 18 + TypeScript + Vite, Electron, sql.js (SQLite in WebAssembly, so
 | Purchase orders & supplier management, auto reorder from the low-stock list | Lightspeed, IQ |
 | Product variants (size / colour) and modifiers (extra shot, no sugar) | Lightspeed, Square, Toast |
 | Promotions: buy 2 get 1, combo deals, happy hour pricing | Shopify POS, Square |
-| Lay-bys and gift vouchers | Lightspeed, Vend |
 | Multi-till / multi-branch with cloud sync and stock transfers | Shopify POS, Lightspeed |
 | Customer-facing display & WhatsApp / email receipts | Loyverse, Square |
 | Integrated card payments (Verifone, Yoco, Adumo) | Yoco, Square |

@@ -8,18 +8,24 @@ import { ShiftScreen } from './screens/Shift';
 import { StockChecker } from './screens/StockChecker';
 import { PettyCash } from './screens/PettyCash';
 import { BackOffice } from './screens/BackOffice';
+import { Laybys } from './screens/Laybys';
+import { Vouchers } from './screens/Vouchers';
+import { ReceiveStock } from './screens/ReceiveStock';
 import { Home, loadOrder, type AppTile } from './screens/Home';
 import { InstallButton } from './components/InstallButton';
 import { Icon } from './components/Icon';
 import type { Role } from './types';
 
-type Screen = 'home' | 'sell' | 'sales' | 'checker' | 'petty' | 'shift' | 'backoffice';
+type Screen = 'home' | 'sell' | 'sales' | 'checker' | 'laybys' | 'vouchers' | 'receive' | 'petty' | 'shift' | 'backoffice';
 type Layout = 'single' | 'tile';
 
 const APPS: (AppTile & { id: Screen; min: Role })[] = [
   { id: 'sell', label: 'Sell', icon: 'cart', min: 'cashier', colors: ['#5ee27f', '#28b44d'] },
   { id: 'sales', label: 'Sales', icon: 'receipt', min: 'cashier', colors: ['#5ac8fa', '#007aff'] },
   { id: 'checker', label: 'Stock Checker', icon: 'scan', min: 'cashier', colors: ['#ffb340', '#ff8a00'] },
+  { id: 'laybys', label: 'Lay-bys', icon: 'bag', min: 'cashier', colors: ['#64d2ff', '#0a84ff'] },
+  { id: 'vouchers', label: 'Vouchers', icon: 'gift', min: 'cashier', colors: ['#ffd60a', '#ff9f0a'] },
+  { id: 'receive', label: 'Receive Stock', icon: 'truck', min: 'supervisor', colors: ['#8e8e93', '#48484a'] },
   { id: 'petty', label: 'Petty Cash', icon: 'wallet', min: 'cashier', colors: ['#ff7aa8', '#ff2d55'] },
   { id: 'shift', label: 'Till', icon: 'cash', min: 'cashier', colors: ['#7bdcb5', '#00a389'] },
   { id: 'backoffice', label: 'Back Office', icon: 'building', min: 'supervisor', colors: ['#a78bfa', '#5856d6'] },
@@ -67,6 +73,9 @@ export function App() {
       case 'sell': return <Sell />;
       case 'sales': return <SalesHistory />;
       case 'checker': return <StockChecker />;
+      case 'laybys': return <Laybys />;
+      case 'vouchers': return <Vouchers />;
+      case 'receive': return <ReceiveStock />;
       case 'petty': return <PettyCash />;
       case 'shift': return <ShiftScreen />;
       case 'backoffice': return <BackOffice />;

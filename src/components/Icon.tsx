@@ -23,6 +23,9 @@ const PATHS: Record<string, string> = {
   tile: 'M3 4h8v16H3zM13 4h8v16h-8z',
   cascade: 'M8 3h13v13H8zM3 8v13h13',
   trash: 'M4 7h16M10 11v6M14 11v6M5 7l1 13a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1l1-13M9 7V4h6v3',
+  bag: 'M6 8h12l1 13H5L6 8zM9 8V6a3 3 0 0 1 6 0v2',
+  gift: 'M4 11h16v10H4zM3 7h18v4H3zM12 7v14M12 7c-1.5-3-5-3-5-1s3 1 5 1zM12 7c1.5-3 5-3 5-1s-3 1-5 1z',
+  truck: 'M2 6h11v10H2zM13 10h4l4 3v3h-8M6.5 19a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zM17.5 19a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z',
   grid: 'M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z',
 };
 

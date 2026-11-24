@@ -38,6 +38,9 @@ export function seedState(): AppState {
       currency: 'R',
       cashierMaxDiscount: 10,
       loyaltyRandPerPoint: 10,
+      laybyMinDepositPct: 10,
+      laybyMonths: 3,
+      laybyCancelFeePct: 10,
     },
     staff: [
       { id: 'staff-mgr', name: 'Manager', pin: '1234', role: 'manager', active: true },
@@ -51,7 +54,7 @@ export function seedState(): AppState {
       p('BAK-001', '6001000000042', 'Croissant', 'Bakery', 2500, 1000, 24, { favourite: true }),
       p('BAK-002', '6001000000059', 'Blueberry Muffin', 'Bakery', 2900, 1100, 3),
       p('BAK-003', '6001000000066', 'Brown Bread Loaf', 'Bakery', 1899, 1200, 15, { vatExempt: true }),
-      p('DRK-001', '6001000000073', 'Still Water 500ml', 'Drinks', 1500, 500, 48, { favourite: true }),
+      p('DRK-001', '6001000000073', 'Still Water 500ml', 'Drinks', 1500, 500, 48, { favourite: true, packs: [{ barcode: '16001000000070', qty: 24 }] }),
       p('DRK-002', '6001000000080', 'Orange Juice 330ml', 'Drinks', 2400, 1100, 30),
       p('DRK-003', '6001000000097', 'Cola 330ml', 'Drinks', 1800, 800, 2),
       p('GRO-001', '6001000000103', 'Fresh Milk 1L', 'Groceries', 2199, 1400, 20, { vatExempt: true }),
@@ -88,7 +91,11 @@ export function seedState(): AppState {
     shifts: [],
     audit: [],
     pettyCash: [],
+    laybys: [],
+    vouchers: [],
+    tillEntries: [],
     nextSaleNumber: 1001,
+    nextLaybyNumber: 1,
   };
 }
 
@@ -97,5 +104,12 @@ export function migrate(s: AppState): AppState {
   s.pettyCash ??= [];
   s.parked ??= [];
   s.audit ??= [];
+  s.laybys ??= [];
+  s.vouchers ??= [];
+  s.tillEntries ??= [];
+  s.nextLaybyNumber ??= 1;
+  s.settings.laybyMinDepositPct ??= 10;
+  s.settings.laybyMonths ??= 3;
+  s.settings.laybyCancelFeePct ??= 10;
   return s;
 }

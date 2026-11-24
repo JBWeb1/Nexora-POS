@@ -196,7 +196,8 @@ server.registerTool(
   {
     description:
       'Run a read-only SQL SELECT against the Nexora SQLite database for questions the other tools do not cover. ' +
-      'Tables: products, customers, sales, sale_lines, payments, shifts, cash_movements, petty_cash, parked_sales, staff, audit_log, meta. ' +
+      'Tables: products, product_packs (box barcodes), customers, sales, sale_lines, payments, shifts, cash_movements, till_entries, petty_cash, ' +
+      'laybys, layby_payments, vouchers, voucher_redemptions, parked_sales, staff, audit_log, meta. ' +
       'Money columns end in _cents (divide by 100 for Rand). Dates are ISO-8601 text in UTC.',
     inputSchema: { sql: z.string().describe('A single SELECT (or WITH ... SELECT) statement') },
   },

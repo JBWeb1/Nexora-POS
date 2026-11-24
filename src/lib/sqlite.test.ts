@@ -4,7 +4,7 @@ import { mkdtempSync, existsSync, readdirSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { seedState } from './seed';
-import { addPettyCash, completeSale, openShift, refundSale } from './actions';
+import { addPettyCash, completeSale, createLayby, issueVoucher, linkBarcode, openShift, payLayby, refundSale } from './actions';
 
 const require = createRequire(import.meta.url);
 const { PosDatabase } = require('../../electron/db.cjs');
@@ -31,6 +31,12 @@ describe('SQLite database (desktop app)', () => {
     addPettyCash(s, { type: 'top_up', amount: 100000, category: 'Float', description: 'Monthly', reference: '', staffId: 'staff-mgr' });
     addPettyCash(s, { type: 'expense', amount: 4599, category: 'Cleaning', description: 'Mop', reference: 'INV1', staffId: 'staff-sup', approvedBy: 'staff-sup' });
 
+    linkBarcode(s, 'staff-mgr', s.products[1].id, '99887766554433', 12);
+    const lb = createLayby(s, { staffId: 'staff-csh', customerId: s.customers[0].id, lines: [{ productId: p.id, name: p.name, unitPrice: p.price, qty: 1, discountPct: 0, vatExempt: false }], cartDiscountPct: 0, deposit: 1000, method: 'cash' });
+    payLayby(s, 'staff-csh', lb.id, 500, 'card');
+    const v = issueVoucher(s, { staffId: 'staff-csh', value: 10000, holderName: 'Gift', holderPhone: '082', method: 'eft' });
+    completeSale(s, { staffId: 'staff-csh', customerId: null, lines: [{ productId: p.id, name: p.name, unitPrice: p.price, qty: 1, discountPct: 0, vatExempt: false }], payments: [{ method: 'voucher', amount: p.price, reference: v.code }], cartDiscountPct: 0 });
+
     const db = await PosDatabase.open(file);
     expect(db.load()).toBeNull();
     db.save(s);
@@ -43,7 +49,7 @@ describe('SQLite database (desktop app)', () => {
 
     // Real SQL works against the file
     const rows = db2.rows("SELECT p.name, SUM(l.qty) AS sold FROM sale_lines l JOIN products p ON p.id = l.product_id GROUP BY p.name");
-    expect(rows).toEqual([{ name: p.name, sold: 1 }]);
+    expect(rows).toEqual([{ name: p.name, sold: 2 }]); // 2 sold, 1 refunded, 1 paid by voucher
 
     db2.dailyBackup(join(dir, 'backups'));
     expect(readdirSync(join(dir, 'backups'))).toHaveLength(1);

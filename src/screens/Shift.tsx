@@ -80,6 +80,7 @@ export function ShiftScreen() {
         <div className="stat"><div className="muted small">Card</div><b>{m(sum.byMethod.card)}</b></div>
         <div className="stat"><div className="muted small">EFT</div><b>{m(sum.byMethod.eft)}</b></div>
         <div className="stat"><div className="muted small">On account</div><b>{m(sum.byMethod.account)}</b></div>
+        <div className="stat"><div className="muted small">Lay-bys & vouchers</div><b>{m(sum.laybyAndVouchers)}</b></div>
       </div>
 
       <div className="two-col">
@@ -99,7 +100,7 @@ export function ShiftScreen() {
         <div className="card">
           <h3>Cash reconciliation</h3>
           <div className="t-row"><span>Opening float</span><span>{m(shift.openingFloat)}</span></div>
-          <div className="t-row"><span>+ Cash sales (less change & cash refunds)</span><span>{m(sum.byMethod.cash)}</span></div>
+          <div className="t-row"><span>+ Cash sales, lay-by & voucher cash (less change & refunds)</span><span>{m(sum.byMethod.cash)}</span></div>
           <div className="t-row"><span>+ Cash added</span><span>{m(sum.cashIn)}</span></div>
           <div className="t-row"><span>− Paid out</span><span>{m(sum.payouts)}</span></div>
           <div className="t-row grand"><span>Expected in drawer</span><span>{m(sum.expectedCash)}</span></div>

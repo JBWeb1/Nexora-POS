@@ -2,7 +2,7 @@ import type { Sale } from '../types';
 import { useStore } from '../store';
 import { formatMoney, lineTotal } from '../lib/money';
 
-const METHOD_LABEL = { cash: 'Cash', card: 'Card', eft: 'EFT', account: 'Account' } as const;
+const METHOD_LABEL = { cash: 'Cash', card: 'Card', eft: 'EFT', account: 'Account', voucher: 'Voucher', layby: 'Lay-by paid' } as const;
 
 export function Receipt({ sale }: { sale: Sale }) {
   const { state } = useStore();

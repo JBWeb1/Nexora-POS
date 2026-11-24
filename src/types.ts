@@ -23,6 +23,13 @@ export interface Product {
   vatExempt: boolean;
   favourite: boolean;
   active: boolean;
+  /** Box / case barcodes, e.g. a carton of 24 */
+  packs?: PackBarcode[];
+}
+
+export interface PackBarcode {
+  barcode: string;
+  qty: number;
 }
 
 export interface Customer {
@@ -47,7 +54,7 @@ export interface CartLine {
   vatExempt: boolean;
 }
 
-export type PaymentMethod = 'cash' | 'card' | 'eft' | 'account';
+export type PaymentMethod = 'cash' | 'card' | 'eft' | 'account' | 'voucher' | 'layby';
 
 export interface Payment {
   method: PaymentMethod;
@@ -144,6 +151,66 @@ export interface Settings {
   loyaltyRandPerPoint: number;
   terminal?: import('./lib/devices').TerminalConfig;
   scannerSuffix?: 'Enter' | 'Tab';
+  laybyMinDepositPct?: number;
+  laybyMonths?: number;
+  laybyCancelFeePct?: number;
+}
+
+/** Money taken at the till that is not a normal sale (lay-by instalments, voucher sales, lay-by refunds). */
+export interface TillEntry {
+  id: string;
+  at: string;
+  shiftId: string;
+  staffId: string;
+  kind: 'layby_payment' | 'layby_refund' | 'voucher_sale';
+  method: PaymentMethod;
+  /** Negative for money paid out */
+  amount: number;
+  reference: string;
+}
+
+export interface LaybyPayment {
+  at: string;
+  method: PaymentMethod;
+  amount: number;
+  staffId: string;
+  shiftId: string;
+}
+
+export interface Layby {
+  id: string;
+  number: number;
+  customerId: string;
+  createdAt: string;
+  staffId: string;
+  dueDate: string;
+  lines: CartLine[];
+  total: number;
+  payments: LaybyPayment[];
+  status: 'open' | 'completed' | 'cancelled';
+  cancelFee?: number;
+  saleId?: string;
+  closedAt?: string;
+}
+
+export interface VoucherRedemption {
+  at: string;
+  amount: number;
+  saleId: string;
+}
+
+export interface Voucher {
+  id: string;
+  code: string;
+  initial: number;
+  balance: number;
+  createdAt: string;
+  expiresAt: string;
+  holderName: string;
+  holderPhone: string;
+  status: 'active' | 'void';
+  staffId: string;
+  redemptions: VoucherRedemption[];
 }
 
 export interface AppState {
@@ -157,5 +224,9 @@ export interface AppState {
   shifts: Shift[];
   audit: AuditEntry[];
   pettyCash: PettyCashEntry[];
+  laybys: Layby[];
+  vouchers: Voucher[];
+  tillEntries: TillEntry[];
   nextSaleNumber: number;
+  nextLaybyNumber: number;
 }

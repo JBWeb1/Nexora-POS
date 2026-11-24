@@ -57,13 +57,38 @@ CREATE TABLE IF NOT EXISTS petty_cash (
   category TEXT, description TEXT, reference TEXT, staff_id TEXT, approved_by TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_petty_at ON petty_cash(at);
+CREATE TABLE IF NOT EXISTS product_packs (
+  product_id TEXT NOT NULL REFERENCES products(id), barcode TEXT NOT NULL UNIQUE, qty INTEGER NOT NULL CHECK (qty >= 1)
+);
+CREATE TABLE IF NOT EXISTS laybys (
+  id TEXT PRIMARY KEY, number INTEGER NOT NULL UNIQUE, customer_id TEXT NOT NULL REFERENCES customers(id), created_at TEXT NOT NULL,
+  staff_id TEXT, due_date TEXT NOT NULL, total_cents INTEGER NOT NULL, status TEXT NOT NULL CHECK (status IN ('open','completed','cancelled')),
+  cancel_fee_cents INTEGER, sale_id TEXT, closed_at TEXT, lines_json TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS layby_payments (
+  layby_id TEXT NOT NULL REFERENCES laybys(id), seq INTEGER NOT NULL, at TEXT NOT NULL, method TEXT NOT NULL,
+  amount_cents INTEGER NOT NULL, staff_id TEXT, shift_id TEXT, PRIMARY KEY (layby_id, seq)
+);
+CREATE TABLE IF NOT EXISTS vouchers (
+  id TEXT PRIMARY KEY, code TEXT NOT NULL UNIQUE, initial_cents INTEGER NOT NULL, balance_cents INTEGER NOT NULL,
+  created_at TEXT NOT NULL, expires_at TEXT NOT NULL, holder_name TEXT, holder_phone TEXT,
+  status TEXT NOT NULL CHECK (status IN ('active','void')), staff_id TEXT
+);
+CREATE TABLE IF NOT EXISTS voucher_redemptions (
+  voucher_id TEXT NOT NULL REFERENCES vouchers(id), seq INTEGER NOT NULL, at TEXT NOT NULL, amount_cents INTEGER NOT NULL, sale_id TEXT,
+  PRIMARY KEY (voucher_id, seq)
+);
+CREATE TABLE IF NOT EXISTS till_entries (
+  id TEXT PRIMARY KEY, at TEXT NOT NULL, shift_id TEXT NOT NULL, staff_id TEXT, kind TEXT NOT NULL, method TEXT NOT NULL,
+  amount_cents INTEGER NOT NULL, reference TEXT
+);
 CREATE TABLE IF NOT EXISTS audit_log (
   id TEXT PRIMARY KEY, at TEXT NOT NULL, staff_id TEXT, action TEXT NOT NULL, detail TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_audit_at ON audit_log(at);
 `;
 
-const TABLES = ['staff', 'products', 'customers', 'cash_movements', 'shifts', 'payments', 'sale_lines', 'sales', 'parked_sales', 'audit_log', 'petty_cash', 'meta'];
+const TABLES = ['product_packs', 'layby_payments', 'laybys', 'voucher_redemptions', 'vouchers', 'till_entries', 'staff', 'products', 'customers', 'cash_movements', 'shifts', 'payments', 'sale_lines', 'sales', 'parked_sales', 'audit_log', 'petty_cash', 'meta'];
 
 class PosDatabase {
   /** @param {string} file path of the .db file */
@@ -106,16 +131,21 @@ class PosDatabase {
     const linesBySale = groupBy(this.rows('SELECT * FROM sale_lines ORDER BY sale_id, line_no'), 'sale_id');
     const paysBySale = groupBy(this.rows('SELECT * FROM payments ORDER BY sale_id, seq'), 'sale_id');
     const movesByShift = groupBy(this.rows('SELECT * FROM cash_movements ORDER BY rowid'), 'shift_id');
+    const packsByProduct = groupBy(this.rows('SELECT * FROM product_packs ORDER BY rowid'), 'product_id');
+    const laybyPays = groupBy(this.rows('SELECT * FROM layby_payments ORDER BY layby_id, seq'), 'layby_id');
+    const redemptions = groupBy(this.rows('SELECT * FROM voucher_redemptions ORDER BY voucher_id, seq'), 'voucher_id');
     const opt = (v) => (v === null || v === undefined ? undefined : v);
 
     return {
       version: Number(meta.version ?? 1),
       settings: JSON.parse(meta.settings),
       nextSaleNumber: Number(meta.nextSaleNumber),
+      nextLaybyNumber: Number(meta.nextLaybyNumber ?? 1),
       staff: this.rows('SELECT * FROM staff ORDER BY rowid').map((r) => ({ id: r.id, name: r.name, pin: r.pin, role: r.role, active: !!r.active })),
       products: this.rows('SELECT * FROM products ORDER BY rowid').map((r) => ({
         id: r.id, sku: r.sku, barcode: r.barcode, name: r.name, category: r.category, price: r.price_cents, cost: r.cost_cents,
         stock: r.stock, reorderLevel: r.reorder_level, vatExempt: !!r.vat_exempt, favourite: !!r.favourite, active: !!r.active,
+        ...(packsByProduct[r.id] ? { packs: packsByProduct[r.id].map((k) => ({ barcode: k.barcode, qty: k.qty })) } : {}),
       })),
       customers: this.rows('SELECT * FROM customers ORDER BY rowid').map((r) => ({
         id: r.id, name: r.name, phone: r.phone ?? '', email: r.email ?? '', loyaltyPoints: r.loyalty_points,
@@ -144,6 +174,20 @@ class PosDatabase {
         id: r.id, at: r.at, type: r.type, amount: r.amount_cents, category: r.category ?? '', description: r.description ?? '',
         reference: r.reference ?? '', staffId: r.staff_id, approvedBy: opt(r.approved_by),
       })),
+      laybys: this.rows('SELECT * FROM laybys ORDER BY rowid').map((r) => ({
+        id: r.id, number: r.number, customerId: r.customer_id, createdAt: r.created_at, staffId: r.staff_id, dueDate: r.due_date,
+        lines: JSON.parse(r.lines_json), total: r.total_cents, status: r.status, cancelFee: opt(r.cancel_fee_cents),
+        saleId: opt(r.sale_id), closedAt: opt(r.closed_at),
+        payments: (laybyPays[r.id] ?? []).map((p) => ({ at: p.at, method: p.method, amount: p.amount_cents, staffId: p.staff_id, shiftId: p.shift_id })),
+      })),
+      vouchers: this.rows('SELECT * FROM vouchers ORDER BY rowid').map((r) => ({
+        id: r.id, code: r.code, initial: r.initial_cents, balance: r.balance_cents, createdAt: r.created_at, expiresAt: r.expires_at,
+        holderName: r.holder_name ?? '', holderPhone: r.holder_phone ?? '', status: r.status, staffId: r.staff_id,
+        redemptions: (redemptions[r.id] ?? []).map((x) => ({ at: x.at, amount: x.amount_cents, saleId: x.sale_id })),
+      })),
+      tillEntries: this.rows('SELECT * FROM till_entries ORDER BY rowid').map((r) => ({
+        id: r.id, at: r.at, shiftId: r.shift_id, staffId: r.staff_id, kind: r.kind, method: r.method, amount: r.amount_cents, reference: r.reference ?? '',
+      })),
       audit: this.rows('SELECT * FROM audit_log ORDER BY rowid').map((r) => ({
         id: r.id, at: r.at, staffId: r.staff_id, action: r.action, detail: r.detail ?? '',
       })),
@@ -166,11 +210,14 @@ class PosDatabase {
       for (const t of TABLES) db.run(`DELETE FROM ${t}`);
       ins('INSERT INTO meta VALUES (?, ?)', [
         ['schemaVersion', String(SCHEMA_VERSION)], ['version', String(s.version)],
-        ['nextSaleNumber', String(s.nextSaleNumber)], ['settings', JSON.stringify(s.settings)],
+        ['nextSaleNumber', String(s.nextSaleNumber)], ['nextLaybyNumber', String(s.nextLaybyNumber ?? 1)], ['settings', JSON.stringify(s.settings)],
       ], (r) => r);
       ins('INSERT INTO staff VALUES (?,?,?,?,?)', s.staff, (x) => [x.id, x.name, x.pin, x.role, b(x.active)]);
       ins('INSERT INTO products VALUES (?,?,?,?,?,?,?,?,?,?,?,?)', s.products, (p) => [
         p.id, p.sku, p.barcode, p.name, p.category, p.price, p.cost, p.stock, p.reorderLevel, b(p.vatExempt), b(p.favourite), b(p.active),
+      ]);
+      ins('INSERT INTO product_packs VALUES (?,?,?)', s.products.flatMap((p) => (p.packs ?? []).map((k) => ({ ...k, productId: p.id }))), (k) => [
+        k.productId, k.barcode, k.qty,
       ]);
       ins('INSERT INTO customers VALUES (?,?,?,?,?,?,?,?)', s.customers, (c) => [
         c.id, c.name, c.phone, c.email, c.loyaltyPoints, c.accountBalance, c.accountLimit, c.notes,
@@ -196,6 +243,21 @@ class PosDatabase {
       ]);
       ins('INSERT INTO petty_cash VALUES (?,?,?,?,?,?,?,?,?)', s.pettyCash ?? [], (e) => [
         e.id, e.at, e.type, e.amount, e.category, e.description, e.reference, e.staffId, n(e.approvedBy),
+      ]);
+      ins('INSERT INTO laybys VALUES (?,?,?,?,?,?,?,?,?,?,?,?)', s.laybys ?? [], (l) => [
+        l.id, l.number, l.customerId, l.createdAt, l.staffId, l.dueDate, l.total, l.status, n(l.cancelFee), n(l.saleId), n(l.closedAt), JSON.stringify(l.lines),
+      ]);
+      ins('INSERT INTO layby_payments VALUES (?,?,?,?,?,?,?)', (s.laybys ?? []).flatMap((l) => l.payments.map((p, i) => ({ ...p, laybyId: l.id, i }))), (p) => [
+        p.laybyId, p.i, p.at, p.method, p.amount, p.staffId, p.shiftId,
+      ]);
+      ins('INSERT INTO vouchers VALUES (?,?,?,?,?,?,?,?,?,?)', s.vouchers ?? [], (v) => [
+        v.id, v.code, v.initial, v.balance, v.createdAt, v.expiresAt, v.holderName, v.holderPhone, v.status, v.staffId,
+      ]);
+      ins('INSERT INTO voucher_redemptions VALUES (?,?,?,?,?)', (s.vouchers ?? []).flatMap((v) => v.redemptions.map((x, i) => ({ ...x, voucherId: v.id, i }))), (x) => [
+        x.voucherId, x.i, x.at, x.amount, x.saleId,
+      ]);
+      ins('INSERT INTO till_entries VALUES (?,?,?,?,?,?,?,?)', s.tillEntries ?? [], (t) => [
+        t.id, t.at, t.shiftId, t.staffId, t.kind, t.method, t.amount, t.reference,
       ]);
       ins('INSERT INTO audit_log VALUES (?,?,?,?,?)', s.audit, (a) => [a.id, a.at, a.staffId, a.action, a.detail]);
       db.run('COMMIT');
