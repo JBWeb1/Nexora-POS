@@ -58,7 +58,7 @@ The desktop app keeps everything in `nexora.db`:
 - macOS: `~/Library/Application Support/Nexora POS/nexora.db`
 - Linux: `~/.config/Nexora POS/nexora.db`
 
-A copy is made into `backups/` every day and kept for 30 days. You can open the file in any SQLite tool (e.g. *DB Browser for SQLite*). The tables are `products`, `customers`, `sales`, `sale_lines`, `payments`, `shifts`, `cash_movements`, `petty_cash`, `parked_sales`, `staff`, `audit_log`, `meta`. Money columns are in cents. Back Office → Settings also has a JSON backup/restore.
+A copy is made into `backups/` every day and kept for 30 days. You can open the file in any SQLite tool (e.g. *DB Browser for SQLite*). The tables are `products`, `product_packs` (box barcodes), `customers`, `laybys`, `layby_payments`, `vouchers`, `voucher_redemptions`, `till_entries`, `sales`, `sale_lines`, `payments`, `shifts`, `cash_movements`, `petty_cash`, `parked_sales`, `staff`, `audit_log`, `meta`. Money columns are in cents. Back Office → Settings also has a JSON backup/restore.
 
 ## Devices
 
