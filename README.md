@@ -11,7 +11,7 @@ A fast, simple point of sale for South African retail: easier to learn than trad
 | Area | What it does |
 | --- | --- |
 | **Home** | Today's takings, till status, low stock and petty cash at a glance. **Arrange Icons** (drag, or sort A–Z), saved per staff member. |
-| **Sell** | One-screen checkout. Scan or tap, quick-cash buttons with the change worked out for you, split payments (cash / card / EFT / account), park & recall sales, line and whole-sale discounts, customers and loyalty points, 80mm receipts. |
+| **Sell** | One-screen checkout. Scan or tap, quick-cash buttons with the change worked out for you, split payments (cash / card / EFT / account), park & recall sales, **easy item removal** (press F3 / Remove then scan or tap the item, swipe a line left, or tap the bin; every removal is audit-logged), line and whole-sale discounts, customers and loyalty points, 80mm receipts. |
 | **Sales** | Find any receipt, reprint, and do partial or full refunds that put the stock back. |
 | **Stock Checker** | Scan any item: price, stock on hand, sold in the last 30 days, how many days of stock are left. Supervisors can correct the count on the spot. |
 | **Petty Cash** | A separate cash box for small expenses (cleaning, stationery, refreshments…) with top-ups, slip numbers, supervisor approval, spend by category and CSV export. Keeps till cash-ups clean. |
@@ -21,7 +21,7 @@ A fast, simple point of sale for South African retail: easier to learn than trad
 
 **Built-in controls:** three roles (cashier, supervisor, manager). Voids, refunds, price changes, large discounts, payouts and petty-cash spends need a supervisor PIN, and everything goes into the audit log. The till auto-locks after 10 minutes idle.
 
-**Keyboard:** `F2` search · `F4` customer · `F6` discount · `F8` park · `F9` recall · `F12` pay · `+`/`-` quantity · type `3*` then scan to add 3.
+**Keyboard:** `F2` search · `F3` remove item (then scan) · `F4` customer · `F6` discount · `F8` park · `F9` recall · `F12` pay · `+`/`-` quantity · type `3*` then scan to add 3.
 
 Demo PINs: Manager **1234**, Supervisor **2222**, Cashier **1111**. Change them in Back Office → Settings.
 

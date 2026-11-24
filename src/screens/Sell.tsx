@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from '../store';
 import type { CartLine, Customer, Payment, PaymentMethod, Product, Sale } from '../types';
 import { calcTotals, formatMoney, lineTotal, paidAmount, parseMoney, quickTenders } from '../lib/money';
@@ -40,12 +40,14 @@ export function Sell() {
     : products.filter((p) => (category === FAV ? p.favourite : p.category === category));
 
   const focusSearch = () => setTimeout(() => searchRef.current?.focus(), 0);
+  const [removeMode, setRemoveMode] = useState(false);
 
   // Hardware scanner (Mindeo etc.): works even when the search box isn't focused. "3*" typed first still multiplies.
   useBarcodeScanner(
     (code) => {
       const hit = products.find((p) => p.barcode === code || p.sku.toLowerCase() === code.toLowerCase());
       if (!hit) return toast(`No product with barcode ${code}`, 'error');
+      if (removeMode) return removeProduct(hit);
       const mult = searchRef.current?.value.match(/^(\d+)\*$/);
       addProduct(hit, mult ? Math.max(1, parseInt(mult[1], 10)) : 1);
     },
@@ -80,16 +82,38 @@ export function Sell() {
     if (!term) return;
     const exact = products.find((p) => p.barcode === term || p.sku.toLowerCase() === term.toLowerCase());
     const hit = exact ?? (visible.length === 1 ? visible[0] : undefined);
-    if (hit) addProduct(hit, qty);
+    if (hit && removeMode) removeProduct(hit);
+    else if (hit) addProduct(hit, qty);
     else if (visible.length > 1) toast(`${visible.length} matches — tap one`, 'info');
     else toast(`No product for "${term}"`, 'error');
   };
 
+  /** Remove mode: scan or tap an item to take ONE of it off the sale, then go back to adding. */
+  const removeProduct = (p: Product) => {
+    setRemoveMode(false);
+    const i = cart.map((l) => l.productId).lastIndexOf(p.id);
+    if (i < 0) {
+      toast(`${p.name} isn't in this sale`, 'error');
+      return focusSearch();
+    }
+    setQty(i, cart[i].qty - 1);
+    setQuery('');
+    toast(`Removed 1 × ${p.name}`);
+    focusSearch();
+  };
+
+  const logRemoval = (l: CartLine, qty: number) =>
+    update((s) => audit(s, user!.id, 'item_removed', `${qty} × ${l.name} (${lineTotal({ ...l, qty })})`));
+
   const setQty = (i: number, qty: number) => {
     if (qty <= 0) return removeLine(i);
+    const line = cart[i];
+    if (line && qty < line.qty) logRemoval(line, line.qty - qty);
     setCart((c) => c.map((l, j) => (j === i ? { ...l, qty } : l)));
   };
   const removeLine = (i: number) => {
+    const line = cart[i];
+    if (line && !(line.qty <= 0)) logRemoval(line, line.qty);
     setCart((c) => c.filter((_, j) => j !== i));
     setSelected((s) => Math.min(s, cart.length - 2));
   };
@@ -152,6 +176,7 @@ export function Sell() {
       if (modal) return;
       const keys: Record<string, () => void> = {
         F2: focusSearch,
+        F3: () => (cart.length ? setRemoveMode((r) => !r) : toast('Nothing to remove', 'info')),
         F4: () => setModal('customer'),
         F6: () => cart.length && setModal('discount'),
         F8: park,
@@ -161,6 +186,8 @@ export function Sell() {
       if (keys[e.key]) {
         e.preventDefault();
         keys[e.key]();
+      } else if (e.key === 'Escape' && removeMode) {
+        setRemoveMode(false);
       } else if (e.key === 'Delete' && selected >= 0 && document.activeElement === searchRef.current && !query) {
         removeLine(selected);
       } else if (e.key === '+' && selected >= 0 && !query) {
@@ -184,12 +211,22 @@ export function Sell() {
   return (
     <div className="sell">
       <section className="sell-left">
+        {removeMode && (
+          <div className="remove-banner" role="status">
+            <span>
+              <b>Remove item</b> — scan or tap the product to take it off the sale
+            </span>
+            <button className="btn small-btn" onClick={() => (setRemoveMode(false), focusSearch())}>
+              Cancel (Esc)
+            </button>
+          </div>
+        )}
         <div className="search-row">
           <Icon name="search" size={20} className="search-icon" />
           <input
             ref={searchRef}
-            className="search"
-            placeholder="Scan or search products"
+            className={`search ${removeMode ? 'removing' : ''}`}
+            placeholder={removeMode ? 'Scan the item to remove' : 'Scan or search products'}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && onSearchEnter()}
@@ -205,9 +242,9 @@ export function Sell() {
             ))}
           </div>
         )}
-        <div className="grid">
+        <div className={`grid ${removeMode ? 'removing' : ''}`}>
           {visible.map((p) => (
-            <button key={p.id} className="tile" onClick={() => addProduct(p)}>
+            <button key={p.id} className="tile" onClick={() => (removeMode ? removeProduct(p) : addProduct(p))}>
               <span className="tile-name">{p.name}</span>
               <span className="tile-price">{m(p.price)}</span>
               <span className={`tile-stock ${p.stock <= p.reorderLevel ? 'low' : ''}`}>{p.stock} in stock</span>
@@ -217,6 +254,7 @@ export function Sell() {
         </div>
         <div className="shortcut-bar">
           <span><kbd>F2</kbd> Search</span>
+          <span><kbd>F3</kbd> Remove item</span>
           <span><kbd>F4</kbd> Customer</span>
           <span><kbd>F6</kbd> Discount</span>
           <span><kbd>F8</kbd> Park</span>
@@ -254,7 +292,8 @@ export function Sell() {
             </div>
           )}
           {cart.map((l, i) => (
-            <div key={i} className={`cart-line ${i === selected ? 'sel' : ''}`} onClick={() => setSelected(i)}>
+            <SwipeToDelete key={`${l.productId}-${i}`} onDelete={() => removeLine(i)}>
+            <div className={`cart-line ${i === selected ? 'sel' : ''}`} onClick={() => setSelected(i)}>
               <div className="cl-main">
                 <div className="cl-name">{l.name}</div>
                 <div className="muted small">
@@ -272,14 +311,24 @@ export function Sell() {
                 </button>
               </div>
               <div className="cl-total">{m(lineTotal(l))}</div>
-              <button
-                className="icon-btn"
-                aria-label="Edit line"
-                onClick={(e) => (e.stopPropagation(), setSelected(i), setModal('lineedit'))}
-              >
-                <Icon name="pencil" size={16} />
-              </button>
+              <div className="cl-btns">
+                <button
+                  className="icon-btn"
+                  aria-label="Edit line"
+                  onClick={(e) => (e.stopPropagation(), setSelected(i), setModal('lineedit'))}
+                >
+                  <Icon name="pencil" size={16} />
+                </button>
+                <button
+                  className="icon-btn trash"
+                  aria-label={`Remove ${l.name}`}
+                  onClick={(e) => (e.stopPropagation(), removeLine(i), focusSearch())}
+                >
+                  <Icon name="trash" size={16} />
+                </button>
+              </div>
             </div>
+            </SwipeToDelete>
           ))}
         </div>
 
@@ -308,6 +357,12 @@ export function Sell() {
           <button className="btn" onClick={park}>Park</button>
           <button className="btn" onClick={() => setModal('recall')}>Recall ({state.parked.length})</button>
           <button className="btn" onClick={() => cart.length && setModal('discount')}>Discount</button>
+          <button
+            className={`btn ${removeMode ? 'remove-on' : ''}`}
+            onClick={() => (cart.length ? (setRemoveMode(!removeMode), focusSearch()) : toast('Nothing to remove', 'info'))}
+          >
+            Remove
+          </button>
           <button className="btn danger-outline" onClick={clearCart}>Void</button>
         </div>
         <button className="btn pay" onClick={startPay} disabled={!cart.length}>
@@ -812,5 +867,44 @@ function ReceiptModal({ sale, onClose }: { sale: Sale; onClose: () => void }) {
         </button>
       </div>
     </Modal>
+  );
+}
+
+/** iOS-style swipe left to delete a cart line (touch screens and mouse drag). */
+function SwipeToDelete({ children, onDelete }: { children: React.ReactNode; onDelete: () => void }) {
+  const [dx, setDx] = useState(0);
+  const start = useRef<{ x: number; y: number; id: number } | null>(null);
+  const THRESHOLD = 110;
+  return (
+    <div className="swipe-wrap">
+      <div className="swipe-delete" aria-hidden="true" style={{ opacity: Math.min(1, -dx / THRESHOLD) }}>
+        <Icon name="trash" size={18} /> Remove
+      </div>
+      <div
+        className="swipe-front"
+        style={{ transform: `translateX(${dx}px)`, transition: start.current ? 'none' : undefined }}
+        onPointerDown={(e) => {
+          if ((e.target as HTMLElement).closest('button')) return;
+          start.current = { x: e.clientX, y: e.clientY, id: e.pointerId };
+        }}
+        onPointerMove={(e) => {
+          const s = start.current;
+          if (!s || s.id !== e.pointerId) return;
+          const moveX = e.clientX - s.x;
+          if (Math.abs(e.clientY - s.y) > 24 && Math.abs(moveX) < 12) return (start.current = null), setDx(0);
+          if (moveX < -6) (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+          setDx(Math.min(0, Math.max(-180, moveX)));
+        }}
+        onPointerUp={() => {
+          const del = dx <= -THRESHOLD;
+          start.current = null;
+          setDx(0);
+          if (del) onDelete();
+        }}
+        onPointerCancel={() => ((start.current = null), setDx(0))}
+      >
+        {children}
+      </div>
+    </div>
   );
 }

@@ -22,6 +22,7 @@ const PATHS: Record<string, string> = {
   home: 'M3 10.5 12 3l9 7.5M5 9v11h5v-6h4v6h5V9',
   tile: 'M3 4h8v16H3zM13 4h8v16h-8z',
   cascade: 'M8 3h13v13H8zM3 8v13h13',
+  trash: 'M4 7h16M10 11v6M14 11v6M5 7l1 13a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1l1-13M9 7V4h6v3',
   grid: 'M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z',
 };
 

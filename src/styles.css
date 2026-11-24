@@ -279,10 +279,9 @@ kbd { background: var(--fill); border-radius: 5px; padding: 1px 6px; font-size: 
 .cart-empty { color: var(--text-2); text-align: center; padding: 60px 20px; display: flex; flex-direction: column; align-items: center; gap: 10px; }
 .cart-empty svg { opacity: 0.35; }
 .cart-line {
-  display: grid; grid-template-columns: 1fr auto 86px 32px; gap: 10px; align-items: center; padding: 10px 6px 10px 12px;
+  display: grid; grid-template-columns: 1fr auto 80px auto; gap: 10px; align-items: center; padding: 10px 6px 10px 12px;
   border-radius: 12px; cursor: pointer; position: relative; transition: background 0.12s;
 }
-.cart-line + .cart-line::before { content: ''; position: absolute; top: 0; left: 12px; right: 0; border-top: 0.5px solid var(--sep); }
 .cart-line.sel { background: var(--primary-soft); }
 .cart-line.sel::before, .cart-line.sel + .cart-line::before { display: none; }
 .cl-name { font-weight: 600; font-size: 0.9375rem; }
@@ -297,7 +296,7 @@ kbd { background: var(--fill); border-radius: 5px; padding: 1px 6px; font-size: 
 .totals { padding: 6px 2px 0; border-top: 0.5px solid var(--sep); }
 .t-row { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; gap: 10px; font-variant-numeric: tabular-nums; }
 .t-row.grand { font-size: 1.625rem; font-weight: 700; letter-spacing: -0.02em; padding-top: 8px; }
-.cart-actions { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.cart-actions { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
 .cart-actions .btn { padding: 8px 4px; font-size: 0.875rem; }
 .btn.pay {
   background: var(--ok); color: #fff; font-size: 1.25rem; font-weight: 700; min-height: 60px; border-radius: 16px;
@@ -450,3 +449,23 @@ td.actions .btn { margin-left: 6px; }
 .provider { cursor: pointer; gap: 12px; }
 .code { background: var(--fill); border-radius: var(--radius-s); padding: 12px; font-family: 'SF Mono', ui-monospace, Menlo, Consolas, monospace; font-size: 0.75rem; overflow: auto; margin: 0; white-space: pre; }
 .save-devices { max-width: 360px; }
+
+/* Removing items */
+.cl-btns { display: flex; gap: 2px; }
+.icon-btn.trash:hover { color: var(--danger); background: var(--danger-soft); }
+.swipe-wrap { position: relative; border-radius: 12px; overflow: hidden; }
+.swipe-delete {
+  position: absolute; inset: 0; background: var(--danger); color: #fff; font-weight: 600; border-radius: 12px;
+  display: flex; align-items: center; justify-content: flex-end; gap: 6px; padding-right: 20px;
+}
+.swipe-front { position: relative; background: var(--panel); transition: transform 0.25s var(--ease); touch-action: pan-y; }
+.swipe-wrap + .swipe-wrap .cart-line::before { content: ''; position: absolute; top: 0; left: 12px; right: 0; border-top: 0.5px solid var(--sep); }
+.swipe-wrap .cart-line.sel::before { display: none; }
+.remove-banner {
+  display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 10px 10px 16px;
+  background: var(--danger); color: #fff; border-radius: 12px; animation: toast-in 0.25s var(--ease);
+}
+.remove-banner .btn { background: rgba(255, 255, 255, 0.22); color: #fff; }
+.search.removing { box-shadow: 0 0 0 2px var(--danger); background: var(--danger-soft); }
+.grid.removing .tile { box-shadow: inset 0 0 0 2px var(--danger), var(--shadow-md); }
+.btn.remove-on { background: var(--danger); color: #fff; }
